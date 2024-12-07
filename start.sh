@@ -867,6 +867,9 @@ InitServer(){
 }
 
 manageNeZhaAgent(){
+  if ! checkInstalled "serv00-play"; then
+     return 1
+  fi
   while true; do
   yellow "-------------------------"
   echo "探针管理："
@@ -907,6 +910,8 @@ manageNeZhaAgent(){
 }
 
 updateAgent(){
+  red "暂不提供在线升级, 只适配哪吒面板v0版本系列。"
+  return 1
   exepath="${installpath}/serv00-play/nezha/nezha-agent"
   if [ ! -e "$exepath" ]; then
     red "未安装探针，请先安装！！!"
@@ -997,7 +1002,7 @@ installNeZhaAgent(){
    cd ${workedir}
    if [[ ! -e nezha-agent ]]; then
     echo "正在下载哪吒探针..."
-    local url="https://github.com/nezhahq/agent/releases/latest/download/nezha-agent_freebsd_amd64.zip"
+    local url="https://github.com/nezhahq/agent/releases/download/v0.20.3/nezha-agent_freebsd_amd64.zip"
     agentZip="nezha-agent.zip"
     if ! wget -qO "$agentZip" "$url"; then
         red "下载哪吒探针失败"
@@ -1256,6 +1261,9 @@ stopMtg(){
 }
 
 mtprotoServ(){
+  if ! checkInstalled "serv00-play"; then
+     return 1
+  fi
    cd ${installpath}/serv00-play
 
    if [ ! -e "dmtg" ]; then
@@ -2313,8 +2321,48 @@ checkInstalled(){
      else 
         return 0
      fi
+  else
+     if [[ ! -d "${installpath}/serv00-play/$model" ]]; then 
+        red "请先安装$model !!!"
+        return 1
+     else 
+        return 0
+     fi
   fi
   return 1
+}
+
+changeHy2IP(){
+   read -p "是否让程序为HY2选择可用的IP？[y/n] [y]:" input
+   input=${input:-y}
+
+   if [[ "$input" == "y" ]]; then
+     cd ${installpath}/serv00-play/singbox
+     if [[ ! -e "singbox.json"  || ! -e "config.json" ]]; then
+        red "未安装节点，请先安装!"
+        return 1
+     fi
+     hy2_ip=$(get_ip)
+     if [[ -z "hy2_ip" ]]; then
+        red "很遗憾，已无可用IP!"
+        return 1
+     fi
+     if ! upInsertFd singbox.json HY2IP "$hy2_ip"; then
+        red "更新singbox.json配置文件失败!"
+        return 1
+     fi
+
+     if ! upSingboxFd config.json "inbounds" "tag" "hysteria-in" "listen" "$hy2_ip"; then 
+        red "更新config.json配置文件失败!"
+        return 1
+     fi
+     green "HY2 更换IP成功，当前IP为 $hy2_ip"
+
+     echo "正在重启sing-box..."
+     stopSingBox
+     startSingBox
+   fi
+
 }
 
 showMenu(){
@@ -2328,7 +2376,7 @@ showMenu(){
 
   options=("安装/更新serv00-play项目" "sun-panel"  "webssh"  "待开发"  "待开发"  "设置保活的项目" "配置sing-box" \
           "运行sing-box" "停止sing-box" "显示sing-box节点信息" "快照恢复" "系统初始化" "设置中国时区及前置工作" "管理哪吒探针" "卸载探针" "设置彩色开机字样" "显示本机IP" \
-          "mtproto代理" "alist管理" "端口管理" "域名证书管理" "一键root" "自动检测主机IP状态" "卸载" )
+          "mtproto代理" "alist管理" "端口管理" "域名证书管理" "一键root" "自动检测主机IP状态" "一键更换hy2的IP" "卸载" )
 
   select opt in "${options[@]}"
   do
@@ -2403,6 +2451,9 @@ showMenu(){
            getUnblockIP
            ;;
         24)
+           changeHy2IP
+           ;;
+        25)
             uninstall
             ;;
         0)
